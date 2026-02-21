@@ -1,16 +1,16 @@
 {
   "meta": {
     "deckId": "flowpitch-landing",
-    "title": "FlowPitch — Web‑native pitches. Decks upgraded.",
+    "title": "FlowPitch — Web-native pitches. Decks upgraded.",
     "theme": "midnight-aurora"
   },
   "slides": [
     {
       "type": "title",
-      "headline": "Web‑native pitches.\nDecks upgraded.",
+      "headline": "Web-native pitches.\nDecks upgraded.",
       "subheadline": "FlowPitch transforms any PPT or PDF into a stunning, shareable web experience that reads fast, looks premium, and drives decisions.",
       "bullets": [
-        "Melbourne‑based · Direct Chronicle alternative"
+        "Melbourne-based · Direct Chronicle alternative"
       ],
       "note": "Hero"
     },
@@ -22,14 +22,14 @@
         "PDFs feel like work to open",
         "No engagement insights",
         "Quality varies wildly",
-        "Updates mean re‑export + re‑send"
+        "Updates mean re-export + re-send"
       ],
       "note": "Problem cards"
     },
     {
       "type": "content",
       "headline": "The solution\nUpload → Theme → Publish a pitch link.",
-      "subheadline": "One link. Zero friction. Looks like a mini‑site.",
+      "subheadline": "One link. Zero friction. Looks like a mini-site.",
       "bullets": [
         "Share a single URL",
         "No attachments, no downloads",
@@ -41,7 +41,7 @@
     {
       "type": "closing",
       "headline": "Stop sending files.\nStart sending experiences.",
-      "subheadline": "Join founders and teams who’ve upgraded from static decks to web‑native pitch links.",
+      "subheadline": "Join founders and teams who’ve upgraded from static decks to web-native pitch links.",
       "bullets": [
         "Get started for free →"
       ],

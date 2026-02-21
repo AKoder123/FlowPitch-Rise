@@ -424,3 +424,36 @@ body.compact{
 }
 body.compact .heroCard__media{ height: 210px; }
 body.compact .slide{ min-height: calc(100dvh - 98px); }
+
+/* ---------- Slide enter animations ---------- */
+:root{
+  --reveal-dur: 700ms;
+  --reveal-ease: cubic-bezier(.2,.9,.2,1);
+}
+.slide [data-animate]{
+  opacity: 0;
+  transform: translateY(14px) scale(.99);
+  filter: blur(6px);
+  transition:
+    opacity var(--reveal-dur) var(--reveal-ease),
+    transform var(--reveal-dur) var(--reveal-ease),
+    filter var(--reveal-dur) var(--reveal-ease);
+  transition-delay: calc(var(--stagger, 0) * 90ms);
+  will-change: opacity, transform, filter;
+}
+.slide.is-active [data-animate]{
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+.slide [data-animate="fade"]{ transform: none; filter: none; }
+.slide [data-animate="pop"]{ transform: translateY(10px) scale(.98); filter: blur(4px); }
+.slide [data-animate="rise"]{ transform: translateY(18px); filter: blur(7px); }
+@media (prefers-reduced-motion: reduce){
+  .slide [data-animate]{
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

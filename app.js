@@ -4,6 +4,7 @@
   - Renders full-viewport sections with scroll-snap
   - Space / Arrow keys navigate between sections
   - Compact layout auto-toggles on short viewports
+  - Animations on slide enter
 */
 (function(){
   const APP = document.getElementById('app');
@@ -12,9 +13,20 @@
   function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
   function setCompact(){
-    // A practical threshold for phones in landscape / small laptop heights.
     const h = window.innerHeight || 800;
     document.body.classList.toggle('compact', h <= 720);
+  }
+
+  function tagForAnimation(root){
+    // Animate common elements in a nice order
+    const targets = root.querySelectorAll(
+      '.kicker, .h1, .h2, .p, .actions, .heroCard, .card, .bigCard, .step'
+    );
+
+    targets.forEach((el, i) => {
+      el.setAttribute('data-animate', 'rise');
+      el.style.setProperty('--stagger', String(i));
+    });
   }
 
   async function load(){
@@ -38,7 +50,7 @@
     APP.innerHTML = '';
     APP.appendChild(deck);
 
-    setupNav(deck, slides.length);
+    setupNav(deck);
   }
 
   function renderSlide(slide, idx){
@@ -71,20 +83,20 @@
     } else if(type === 'content' && slide.note === 'Solution cards'){
       right.appendChild(buildCards([
         {title:'One link, zero friction', desc:'Share a single URL. No attachments, no broken layouts.', icon:'dot'},
-        {title:'Feels like a mini‑site', desc:'Brandable themes, smooth navigation, premium reading.', icon:'dot'},
+        {title:'Feels like a mini-site', desc:'Brandable themes, smooth navigation, premium reading.', icon:'dot'},
         {title:'Measurable impact', desc:'Know what got read—then follow up with precision.', icon:'dot'},
       ]));
     } else if(type === 'content' && slide.note === 'Steps'){
-      inner.classList.add('slide__inner--steps');
       right.appendChild(buildSteps());
     } else if(type === 'closing'){
-      inner.className = 'slide__inner'; // single column via slide--center
+      inner.className = 'slide__inner';
       const card = document.createElement('div');
       card.className = 'bigCard';
       card.appendChild(buildHeader(slide, 'closing'));
       card.appendChild(buildClosingAction());
       inner.appendChild(card);
       section.appendChild(inner);
+      tagForAnimation(section);
       return section;
     } else {
       right.appendChild(buildCardsFromBullets(slide));
@@ -93,6 +105,7 @@
     inner.appendChild(left);
     inner.appendChild(right);
     section.appendChild(inner);
+    tagForAnimation(section);
     return section;
   }
 
@@ -127,13 +140,11 @@
   }
 
   function stylizeHeadline(headline){
-    // Apply gradient emphasis to specific words to match screenshots.
-    // We do this safely (no raw HTML from content.json).
     const lines = String(headline).split('\n');
     const safe = lines.map(escapeHtml);
 
     // Hero emphasis
-    if(safe.join('\n').includes('Web‑native pitches.') || safe.join('\n').includes('Web-native pitches.')){
+    if(safe.join('\n').includes('Web-native pitches.')){
       return safe.join('<br/>')
         .replace('Decks', '<span class="grad">Decks</span>')
         .replace('upgraded.', '<span class="grad">upgraded.</span>');
@@ -201,7 +212,6 @@
       ic.className = 'card__icon';
       ic.setAttribute('aria-hidden', 'true');
 
-      // Minimal icons: dot or emoji-like via CSS shapes
       if(it.icon === 'file'){
         ic.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3h7l3 3v15a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Z" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/><path d="M14 3v4a2 2 0 0 0 2 2h4" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/></svg>';
       } else if(it.icon === 'search'){
@@ -289,7 +299,7 @@
     return actions;
   }
 
-  function setupNav(container, count){
+  function setupNav(container){
     let index = 0;
 
     const slides = () => Array.from(container.querySelectorAll('.slide'));
@@ -301,7 +311,6 @@
       const el = list[index];
       if(!el) return;
       const top = el.offsetTop;
-      // Respect reduced motion
       container.parentElement.scrollTo({ top, behavior: prefersReduced ? 'auto' : 'smooth' });
     }
 
@@ -341,6 +350,18 @@
 
     // Start at top
     go(0);
+
+    // Mark slides active on enter (drives CSS reveal)
+    const list = slides();
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if(entry.isIntersecting){
+          entry.target.classList.add('is-active');
+        }
+      });
+    }, { root: container.parentElement, threshold: 0.55 });
+
+    list.forEach(s => obs.observe(s));
   }
 
   function escapeHtml(str){
