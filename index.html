@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>FlowPitch</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg">
+    <div class="bg-aurora"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-vignette"></div>
+  </div>
+
+  <header class="topbar" role="banner">
+    <div class="topbar__inner">
+      <a class="brand" href="#0" aria-label="FlowPitch home">
+        <span class="brand__mark" aria-hidden="true">
+          <span class="mark__blob"></span>
+          <span class="mark__shine"></span>
+        </span>
+        <span class="brand__text">FlowPitch</span>
+      </a>
+
+      <nav class="nav" aria-label="Primary">
+        <a class="nav__link" href="#login">Login</a>
+        <a class="btn btn--primary" href="#start">Start Free</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="app" id="app" aria-live="polite">
+    <div class="loading">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="loading__text">Loading…</div>
+    </div>
+  </main>
+
+  <div class="hint" aria-hidden="true">
+    <span class="hint__key">Space</span>
+    <span class="hint__text">Next section</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

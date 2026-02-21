@@ -1,0 +1,369 @@
+/*
+  FlowPitch landing deck renderer
+  - Loads content.json
+  - Renders full-viewport sections with scroll-snap
+  - Space / Arrow keys navigate between sections
+  - Compact layout auto-toggles on short viewports
+*/
+(function(){
+  const APP = document.getElementById('app');
+  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+  function setCompact(){
+    // A practical threshold for phones in landscape / small laptop heights.
+    const h = window.innerHeight || 800;
+    document.body.classList.toggle('compact', h <= 720);
+  }
+
+  async function load(){
+    setCompact();
+    window.addEventListener('resize', setCompact, {passive:true});
+
+    const res = await fetch('content.json', {cache: 'no-store'});
+    if(!res.ok) throw new Error('Failed to load content.json');
+    const data = await res.json();
+
+    document.title = (data?.meta?.title) ? data.meta.title : 'FlowPitch';
+
+    const deck = document.createElement('div');
+    deck.className = 'deck';
+    deck.setAttribute('role', 'region');
+    deck.setAttribute('aria-label', 'FlowPitch sections');
+
+    const slides = Array.isArray(data.slides) ? data.slides : [];
+    slides.forEach((s, idx) => deck.appendChild(renderSlide(s, idx)));
+
+    APP.innerHTML = '';
+    APP.appendChild(deck);
+
+    setupNav(deck, slides.length);
+  }
+
+  function renderSlide(slide, idx){
+    const type = slide.type || 'content';
+    const section = document.createElement('section');
+    section.className = 'slide' + (type === 'closing' ? ' slide--center' : '');
+    section.dataset.index = String(idx);
+    section.id = String(idx);
+
+    const inner = document.createElement('div');
+    inner.className = 'slide__inner';
+
+    // Left column (copy)
+    const left = document.createElement('div');
+    const headerBits = buildHeader(slide, type);
+    left.appendChild(headerBits);
+
+    // Right column (visual / cards)
+    const right = document.createElement('div');
+
+    if(type === 'title'){
+      right.appendChild(buildHeroVisual());
+      left.appendChild(buildHeroActions());
+    } else if(type === 'content' && slide.note === 'Problem cards'){
+      right.appendChild(buildCards([
+        {title:'PDFs kill momentum', desc:'Recipients skim, bounce, and you get zero signal back.', icon:'file'},
+        {title:'No engagement insights', desc:'Did they read it? What mattered? You\'ll never know.', icon:'search'},
+        {title:'Quality varies wildly', desc:'The story breaks across devices, formats, and viewers.', icon:'palette'},
+      ]));
+    } else if(type === 'content' && slide.note === 'Solution cards'){
+      right.appendChild(buildCards([
+        {title:'One link, zero friction', desc:'Share a single URL. No attachments, no broken layouts.', icon:'dot'},
+        {title:'Feels like a mini‑site', desc:'Brandable themes, smooth navigation, premium reading.', icon:'dot'},
+        {title:'Measurable impact', desc:'Know what got read—then follow up with precision.', icon:'dot'},
+      ]));
+    } else if(type === 'content' && slide.note === 'Steps'){
+      inner.classList.add('slide__inner--steps');
+      right.appendChild(buildSteps());
+    } else if(type === 'closing'){
+      inner.className = 'slide__inner'; // single column via slide--center
+      const card = document.createElement('div');
+      card.className = 'bigCard';
+      card.appendChild(buildHeader(slide, 'closing'));
+      card.appendChild(buildClosingAction());
+      inner.appendChild(card);
+      section.appendChild(inner);
+      return section;
+    } else {
+      right.appendChild(buildCardsFromBullets(slide));
+    }
+
+    inner.appendChild(left);
+    inner.appendChild(right);
+    section.appendChild(inner);
+    return section;
+  }
+
+  function buildHeader(slide, type){
+    const wrap = document.createElement('div');
+
+    if(type === 'title' && Array.isArray(slide.bullets) && slide.bullets[0]){
+      const kicker = document.createElement('div');
+      kicker.className = 'kicker';
+      const dot = document.createElement('span');
+      dot.className = 'kicker__dot';
+      dot.setAttribute('aria-hidden', 'true');
+      const txt = document.createElement('span');
+      txt.textContent = slide.bullets[0];
+      kicker.appendChild(dot);
+      kicker.appendChild(txt);
+      wrap.appendChild(kicker);
+    }
+
+    const h = document.createElement('h1');
+    h.className = (type === 'title') ? 'h1' : 'h2';
+    h.innerHTML = stylizeHeadline(slide.headline || '');
+    wrap.appendChild(h);
+
+    if(slide.subheadline){
+      const p = document.createElement('p');
+      p.className = 'p';
+      p.textContent = slide.subheadline;
+      wrap.appendChild(p);
+    }
+    return wrap;
+  }
+
+  function stylizeHeadline(headline){
+    // Apply gradient emphasis to specific words to match screenshots.
+    // We do this safely (no raw HTML from content.json).
+    const lines = String(headline).split('\n');
+    const safe = lines.map(escapeHtml);
+
+    // Hero emphasis
+    if(safe.join('\n').includes('Web‑native pitches.') || safe.join('\n').includes('Web-native pitches.')){
+      return safe.join('<br/>')
+        .replace('Decks', '<span class="grad">Decks</span>')
+        .replace('upgraded.', '<span class="grad">upgraded.</span>');
+    }
+
+    if(safe.join('\n').includes('Stop sending')){
+      return safe.join('<br/>')
+        .replace('Start', '<span class="grad">Start</span>')
+        .replace('sending', '<span class="grad">sending</span>')
+        .replace('experiences.', '<span class="grad">experiences.</span>');
+    }
+
+    return safe.join('<br/>');
+  }
+
+  function buildHeroActions(){
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const a = document.createElement('a');
+    a.className = 'btn btn--primary';
+    a.href = '#start';
+    a.innerHTML = 'Start for free <span class="btn__arrow" aria-hidden="true">→</span>';
+
+    const b = document.createElement('a');
+    b.className = 'btn btn--ghost';
+    b.href = '#demo';
+    b.textContent = 'Watch demo';
+
+    actions.appendChild(a);
+    actions.appendChild(b);
+    return actions;
+  }
+
+  function buildHeroVisual(){
+    const card = document.createElement('div');
+    card.className = 'heroCard';
+
+    const media = document.createElement('div');
+    media.className = 'heroCard__media';
+
+    const planes = document.createElement('div');
+    planes.className = 'deckPlanes';
+    const l = document.createElement('div'); l.className = 'plane plane--l';
+    const m = document.createElement('div'); m.className = 'plane plane--m';
+    const r = document.createElement('div'); r.className = 'plane plane--r';
+    planes.appendChild(l); planes.appendChild(m); planes.appendChild(r);
+
+    media.appendChild(planes);
+    card.appendChild(media);
+    return card;
+  }
+
+  function buildCards(items){
+    const wrap = document.createElement('div');
+    wrap.className = 'cards';
+    items.forEach(it => {
+      const c = document.createElement('div');
+      c.className = 'card';
+
+      const row = document.createElement('div');
+      row.className = 'card__row';
+
+      const ic = document.createElement('div');
+      ic.className = 'card__icon';
+      ic.setAttribute('aria-hidden', 'true');
+
+      // Minimal icons: dot or emoji-like via CSS shapes
+      if(it.icon === 'file'){
+        ic.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3h7l3 3v15a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Z" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/><path d="M14 3v4a2 2 0 0 0 2 2h4" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/></svg>';
+      } else if(it.icon === 'search'){
+        ic.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/><path d="M16.5 16.5 21 21" stroke="rgba(255,255,255,.72)" stroke-width="1.6" stroke-linecap="round"/></svg>';
+      } else if(it.icon === 'palette'){
+        ic.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.5a2.5 2.5 0 0 0 0-5H13a2 2 0 0 1 0-4h3a5 5 0 0 0 0-10H12Z" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/><path d="M8 11h.01M9 7h.01M12 6h.01M16 8h.01" stroke="rgba(255,255,255,.72)" stroke-width="2.2" stroke-linecap="round"/></svg>';
+      } else {
+        const d = document.createElement('span');
+        d.className = 'dot';
+        ic.appendChild(d);
+      }
+
+      const col = document.createElement('div');
+      const t = document.createElement('p');
+      t.className = 'card__title';
+      t.textContent = it.title;
+      const d = document.createElement('p');
+      d.className = 'card__desc';
+      d.textContent = it.desc;
+
+      col.appendChild(t);
+      col.appendChild(d);
+
+      row.appendChild(ic);
+      row.appendChild(col);
+      c.appendChild(row);
+      wrap.appendChild(c);
+    });
+    return wrap;
+  }
+
+  function buildCardsFromBullets(slide){
+    const bullets = Array.isArray(slide.bullets) ? slide.bullets : [];
+    const items = bullets.slice(0, 3).map(b => ({title: b, desc: '—'}));
+    return buildCards(items);
+  }
+
+  function buildSteps(){
+    const wrap = document.createElement('div');
+    wrap.className = 'steps';
+
+    const steps = [
+      {n:'01', t:'Upload your deck', d:'Drop a PPT, PDF, or Google Slides link.'},
+      {n:'02', t:'Theme it your way', d:'Apply brand colors, fonts, and layout in one click.'},
+      {n:'03', t:'Publish & share', d:'Send a pitch link that looks great everywhere.'},
+    ];
+
+    steps.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'step';
+
+      const num = document.createElement('div');
+      num.className = 'step__num';
+      num.textContent = s.n;
+
+      const col = document.createElement('div');
+      const t = document.createElement('p');
+      t.className = 'step__title';
+      t.textContent = s.t;
+      const d = document.createElement('p');
+      d.className = 'step__desc';
+      d.textContent = s.d;
+      col.appendChild(t);
+      col.appendChild(d);
+
+      row.appendChild(num);
+      row.appendChild(col);
+      wrap.appendChild(row);
+    });
+
+    return wrap;
+  }
+
+  function buildClosingAction(){
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.style.justifyContent = 'center';
+
+    const a = document.createElement('a');
+    a.className = 'btn btn--primary';
+    a.href = '#start';
+    a.innerHTML = 'Get started for free <span class="btn__arrow" aria-hidden="true">→</span>';
+    actions.appendChild(a);
+
+    return actions;
+  }
+
+  function setupNav(container, count){
+    let index = 0;
+
+    const slides = () => Array.from(container.querySelectorAll('.slide'));
+
+    function go(next){
+      const list = slides();
+      const max = Math.max(0, list.length - 1);
+      index = clamp(next, 0, max);
+      const el = list[index];
+      if(!el) return;
+      const top = el.offsetTop;
+      // Respect reduced motion
+      container.parentElement.scrollTo({ top, behavior: prefersReduced ? 'auto' : 'smooth' });
+    }
+
+    // Keep index in sync with scroll (approx)
+    let raf = 0;
+    container.parentElement.addEventListener('scroll', () => {
+      if(raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const sc = container.parentElement.scrollTop;
+        const list = slides();
+        let best = 0, bestDist = Infinity;
+        for(let i=0;i<list.length;i++){
+          const d = Math.abs(list[i].offsetTop - sc);
+          if(d < bestDist){ bestDist = d; best = i; }
+        }
+        index = best;
+      });
+    }, {passive:true});
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key;
+      const isTyping = /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) ? e.target.tagName : '');
+      if(isTyping) return;
+
+      if(key === ' '){
+        e.preventDefault();
+        go(index + 1);
+      } else if(key === 'ArrowDown' || key === 'PageDown'){
+        e.preventDefault();
+        go(index + 1);
+      } else if(key === 'ArrowUp' || key === 'PageUp'){
+        e.preventDefault();
+        go(index - 1);
+      }
+    });
+
+    // Start at top
+    go(0);
+  }
+
+  function escapeHtml(str){
+    return String(str)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#039;");
+  }
+
+  load().catch(err => {
+    console.error(err);
+    APP.innerHTML = '';
+    const s = document.createElement('section');
+    s.className = 'slide slide--center';
+    const inner = document.createElement('div');
+    inner.className = 'slide__inner';
+    const card = document.createElement('div');
+    card.className = 'bigCard';
+    card.innerHTML = '<h1 class="h2">Could not load content</h1><p class="p">Make sure content.json is next to index.html.</p>';
+    inner.appendChild(card);
+    s.appendChild(inner);
+    APP.appendChild(s);
+  });
+})();
