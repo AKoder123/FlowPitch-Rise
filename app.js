@@ -49,6 +49,96 @@
       btn.style.pointerEvents = busy ? 'none' : 'auto';
     };
 
+    const buildStageForSlide = (slideEl) => {
+      // Create an offscreen stage that includes the background + one slide at a fixed 16:9 size
+      const stage = document.createElement('div');
+      stage.id = 'pdfStage';
+
+      const bg = document.querySelector('.bg');
+      if(bg) stage.appendChild(bg.cloneNode(true));
+
+      const app = document.createElement('div');
+      app.className = 'app';
+
+      const s = slideEl.cloneNode(true);
+      // Ensure slide is fully visible
+      s.classList.add('is-active');
+
+      app.appendChild(s);
+      stage.appendChild(app);
+
+      document.body.appendChild(stage);
+      return stage;
+    };
+
+    const removeStage = (stage) => {
+      if(stage && stage.parentNode) stage.parentNode.removeChild(stage);
+    };
+
+    const exportPdf = async () => {
+      try{
+        setBusy(true);
+        // Export styles: fixed canvas size and no gradient-clip text
+        document.body.classList.add('exportingPdf');
+        setExporting(true);
+        await ensureLibs();
+
+        const { jsPDF } = window.jspdf;
+        const deck = document.querySelector('.deck');
+        if(!deck) throw new Error('Deck not ready');
+
+        const slides = Array.from(deck.querySelectorAll('.slide'));
+        if(!slides.length) throw new Error('No slides found');
+
+        // Perfect 16:9 page size matching our stage (units in px)
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1920, 1080] });
+
+        for(let i=0;i<slides.length;i++){
+          const stage = buildStageForSlide(slides[i]);
+
+          // Wait for layout/paint
+          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+          const canvas = await window.html2canvas(stage, {
+            backgroundColor: '#050611',
+            scale: 2,
+            useCORS: true,
+            logging: false
+          });
+
+          const imgData = canvas.toDataURL('image/png');
+
+          if(i > 0) pdf.addPage([1920,1080], 'landscape');
+          pdf.addImage(imgData, 'PNG', 0, 0, 1920, 1080, undefined, 'FAST');
+
+          removeStage(stage);
+        }
+
+        pdf.save('FlowPitch.pdf');
+      }catch(err){
+        console.error(err);
+        alert('PDF export failed. If you are on iOS, try Chrome/desktop for best results and ensure downloads are allowed.');
+      }finally{
+        document.body.classList.remove('exportingPdf');
+        setExporting(false);
+        setBusy(false);
+      }
+    };
+
+    btn.addEventListener('click', exportPdf);
+  }
+      if(!window.jspdf || !window.jspdf.jsPDF){
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      }
+    };
+
+    const setBusy = (busy) => {
+      btn.disabled = busy;
+      btn.style.opacity = busy ? '0.65' : '1';
+      btn.textContent = busy ? 'Exporting…' : 'Export PDF';
+      btn.style.pointerEvents = busy ? 'none' : 'auto';
+    };
+
     const exportPdf = async () => {
       try{
         setBusy(true);

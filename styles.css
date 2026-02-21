@@ -517,3 +517,65 @@ body.exporting .slide [data-animate]{
 
 
 .btn--pdf:disabled{ cursor: not-allowed; }
+
+
+/* ---------- PDF (canvas) export mode ---------- */
+body.exportingPdf .topbar,
+body.exportingPdf .hint{ display: none !important; }
+
+body.exportingPdf .app{
+  height: auto !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+/* Force a consistent 16:9 canvas per slide */
+body.exportingPdf .slide{
+  width: 1920px !important;
+  height: 1080px !important;
+  min-height: 0 !important;
+  padding: 90px 96px !important;
+  scroll-snap-align: none !important;
+  scroll-margin-top: 0 !important;
+}
+
+/* Ensure content can use the full width */
+body.exportingPdf .slide__inner{
+  max-width: none !important;
+}
+
+/* During export, remove any blur/filters and make animations fully visible */
+body.exportingPdf [data-animate]{
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+
+/* html2canvas often struggles with background-clip text; fall back to solid color during export */
+body.exportingPdf .grad{
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  color: rgba(255,255,255,.92) !important;
+}
+
+/* Stage wrapper used for capture */
+#pdfStage{
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: #050611;
+}
+#pdfStage .bg{
+  position: absolute !important;
+  inset: 0 !important;
+}
+#pdfStage .app{
+  position: absolute !important;
+  inset: 0 !important;
+  padding: 0 !important;
+}
