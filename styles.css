@@ -157,7 +157,7 @@ body{
   overflow:auto;
   scroll-snap-type: y mandatory;
   scroll-behavior:smooth;
-  padding-top: calc(env(safe-area-inset-top) + 86px);
+  padding-top: var(--topOffset, calc(env(safe-area-inset-top) + 96px));
   padding-bottom: calc(env(safe-area-inset-bottom) + 22px);
 }
 .loading{
@@ -178,6 +178,7 @@ body{
 
 .slide{
   scroll-snap-align: start;
+  scroll-margin-top: var(--topOffset, 120px);
   min-height: calc(100dvh - 110px);
   display:flex;
   align-items:center;

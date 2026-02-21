@@ -17,6 +17,16 @@
     document.body.classList.toggle('compact', h <= 720);
   }
 
+  function setTopOffset(){
+    const header = document.querySelector('.topbar');
+    if(!header) return;
+    // header height already includes safe-area padding because the header uses env(safe-area-inset-top)
+    const h = Math.ceil(header.getBoundingClientRect().height);
+    // add a little breathing room so text never kisses the bar
+    const offset = h + 10;
+    document.documentElement.style.setProperty('--topOffset', offset + 'px');
+  }
+
   function tagForAnimation(root){
     // Animate common elements in a nice order
     const targets = root.querySelectorAll(
@@ -31,7 +41,8 @@
 
   async function load(){
     setCompact();
-    window.addEventListener('resize', setCompact, {passive:true});
+    setTopOffset();
+    window.addEventListener('resize', () => { setCompact(); setTopOffset(); }, {passive:true});
 
     const res = await fetch('content.json', {cache: 'no-store'});
     if(!res.ok) throw new Error('Failed to load content.json');
@@ -50,6 +61,7 @@
     APP.innerHTML = '';
     APP.appendChild(deck);
 
+    requestAnimationFrame(() => setTopOffset());
     setupNav(deck);
   }
 
