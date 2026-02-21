@@ -24,19 +24,94 @@
     const btn = document.getElementById('exportPdfBtn');
     if(!btn) return;
 
-    const doPrint = () => {
-      setExporting(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.print();
-        });
-      });
+    const loadScript = (src) => new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+
+    const ensureLibs = async () => {
+      if(!window.html2canvas){
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      }
+      if(!window.jspdf || !window.jspdf.jsPDF){
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      }
     };
 
-    btn.addEventListener('click', doPrint);
+    const setBusy = (busy) => {
+      btn.disabled = busy;
+      btn.style.opacity = busy ? '0.65' : '1';
+      btn.textContent = busy ? 'Exporting…' : 'Export PDF';
+      btn.style.pointerEvents = busy ? 'none' : 'auto';
+    };
 
-    window.addEventListener('beforeprint', () => setExporting(true));
-    window.addEventListener('afterprint', () => setExporting(false));
+    const exportPdf = async () => {
+      try{
+        setBusy(true);
+        setExporting(true);
+        await ensureLibs();
+
+        const { jsPDF } = window.jspdf;
+        const scroller = document.querySelector('.app');
+        const deck = document.querySelector('.deck');
+        if(!deck || !scroller) throw new Error('Deck not ready');
+
+        const slides = Array.from(deck.querySelectorAll('.slide'));
+        if(!slides.length) throw new Error('No slides found');
+
+        // Give browser a moment to apply exporting styles
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        // Render first slide to determine page sizing (use A4 landscape for compatibility)
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+
+        for(let i=0;i<slides.length;i++){
+          // Scroll slide into view to avoid iOS canvas blanking
+          slides[i].scrollIntoView({block:'start'});
+          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+          const canvas = await window.html2canvas(slides[i], {
+            backgroundColor: null,
+            scale: Math.max(2, window.devicePixelRatio || 2),
+            useCORS: true,
+            logging: false
+          });
+
+          const imgData = canvas.toDataURL('image/png');
+
+          // Fit image into page while preserving aspect ratio
+          const imgW = canvas.width;
+          const imgH = canvas.height;
+          const scale = Math.min(pageW / imgW, pageH / imgH);
+          const drawW = imgW * scale;
+          const drawH = imgH * scale;
+          const x = (pageW - drawW) / 2;
+          const y = (pageH - drawH) / 2;
+
+          if(i > 0) pdf.addPage('a4', 'landscape');
+          pdf.addImage(imgData, 'PNG', x, y, drawW, drawH, undefined, 'FAST');
+        }
+
+        // Restore scroll position to top
+        scroller.scrollTo({top: 0, behavior: 'auto'});
+
+        pdf.save('FlowPitch.pdf');
+      }catch(err){
+        console.error(err);
+        alert('PDF export failed. Try again in Chrome desktop, or ensure popups/downloads are allowed.');
+      }finally{
+        setExporting(false);
+        setBusy(false);
+      }
+    };
+
+    btn.addEventListener('click', exportPdf);
   }
 
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }

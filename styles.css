@@ -514,3 +514,6 @@ body.exporting .slide [data-animate]{
   .slide__inner{ break-inside: avoid; }
   .card, .bigCard, .heroCard, .step{ break-inside: avoid; }
 }
+
+
+.btn--pdf:disabled{ cursor: not-allowed; }
