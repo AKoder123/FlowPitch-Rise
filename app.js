@@ -10,7 +10,36 @@
   const APP = document.getElementById('app');
   const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+    function setExporting(on){
+    document.body.classList.toggle('exporting', !!on);
+    const deck = document.querySelector('.deck');
+    if(!deck) return;
+    const slides = deck.querySelectorAll('.slide');
+    slides.forEach(s => {
+      if(on) s.classList.add('is-active');
+    });
+  }
+
+  function setupPdfExport(){
+    const btn = document.getElementById('exportPdfBtn');
+    if(!btn) return;
+
+    const doPrint = () => {
+      setExporting(true);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.print();
+        });
+      });
+    };
+
+    btn.addEventListener('click', doPrint);
+
+    window.addEventListener('beforeprint', () => setExporting(true));
+    window.addEventListener('afterprint', () => setExporting(false));
+  }
+
+function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
   function setCompact(){
     const h = window.innerHeight || 800;
@@ -23,7 +52,7 @@
     // header height already includes safe-area padding because the header uses env(safe-area-inset-top)
     const h = Math.ceil(header.getBoundingClientRect().height);
     // add a little breathing room so text never kisses the bar
-    const offset = h + 10;
+    const offset = h + 28;
     document.documentElement.style.setProperty('--topOffset', offset + 'px');
   }
 
@@ -43,6 +72,7 @@
     setCompact();
     setTopOffset();
     window.addEventListener('resize', () => { setCompact(); setTopOffset(); }, {passive:true});
+    window.addEventListener('orientationchange', () => { setCompact(); setTopOffset(); });
 
     const res = await fetch('content.json', {cache: 'no-store'});
     if(!res.ok) throw new Error('Failed to load content.json');
@@ -62,7 +92,11 @@
     APP.appendChild(deck);
 
     requestAnimationFrame(() => setTopOffset());
+    if(document.fonts && document.fonts.ready){
+      document.fonts.ready.then(() => setTopOffset()).catch(() => {});
+    }
     setupNav(deck);
+    setupPdfExport();
   }
 
   function renderSlide(slide, idx){

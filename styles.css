@@ -157,7 +157,7 @@ body{
   overflow:auto;
   scroll-snap-type: y mandatory;
   scroll-behavior:smooth;
-  padding-top: var(--topOffset, calc(env(safe-area-inset-top) + 96px));
+  padding-top: var(--topOffset, calc(env(safe-area-inset-top) + 140px));
   padding-bottom: calc(env(safe-area-inset-bottom) + 22px);
 }
 .loading{
@@ -457,4 +457,60 @@ body.compact .slide{ min-height: calc(100dvh - 98px); }
     transform: none !important;
     filter: none !important;
   }
+}
+
+
+/* Extra mobile header safety (prevents any overlap even if iOS changes viewport bars) */
+@media (max-width: 520px){
+  .slide{ padding-top: calc(var(--padY) + 18px); }
+}
+
+
+/* PDF button */
+.btn--pdf{
+  cursor: pointer;
+}
+
+/* When printing/exporting, force all animated elements visible */
+body.exporting [data-animate],
+body.exporting .slide [data-animate]{
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+
+/* Print-to-PDF layout: one slide per page, high-quality vector text */
+@media print{
+  @page { margin: 0; }
+  html, body{
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #050611 !important;
+  }
+
+  .bg{ position: fixed !important; inset: 0 !important; }
+  .topbar, .hint{ display: none !important; }
+
+  .app{
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    scroll-snap-type: none !important;
+  }
+
+  .slide{
+    min-height: 100vh !important;
+    page-break-after: always;
+    break-after: page;
+    scroll-snap-align: none !important;
+    scroll-margin-top: 0 !important;
+    padding: 44px 44px !important;
+  }
+
+  /* Avoid weird clipping */
+  .slide__inner{ break-inside: avoid; }
+  .card, .bigCard, .heroCard, .step{ break-inside: avoid; }
 }
