@@ -1,21 +1,46 @@
 /*
   FlowPitch landing deck renderer
   - Loads content.json
-  - Renders full-viewport sections with scroll-snap
-  - Space / Arrow keys navigate between sections
-  - Compact layout auto-toggles on short viewports
-  - Animations on slide enter
+  - Scroll-snap sections + Space/Arrow navigation
+  - Compact layout + header-safe offset on mobile
+  - Slide-enter animations
+  - Export PDF (client-side) with all elements visible
 */
 (function(){
   const APP = document.getElementById('app');
   const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    function setExporting(on){
-    document.body.classList.toggle('exporting', !!on);
+  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+  function setCompact(){
+    const h = window.innerHeight || 800;
+    document.body.classList.toggle('compact', h <= 720);
+  }
+
+  function setTopOffset(){
+    const header = document.querySelector('.topbar');
+    if(!header) return;
+    const h = Math.ceil(header.getBoundingClientRect().height);
+    // extra buffer for iOS dynamic bars
+    const offset = h + 28;
+    document.documentElement.style.setProperty('--topOffset', offset + 'px');
+  }
+
+  function tagForAnimation(root){
+    const targets = root.querySelectorAll(
+      '.kicker, .h1, .h2, .p, .actions, .heroCard, .card, .bigCard, .step'
+    );
+    targets.forEach((el, i) => {
+      el.setAttribute('data-animate', 'rise');
+      el.style.setProperty('--stagger', String(i));
+    });
+  }
+
+  function setExportingVisible(on){
+    // Used for both print and canvas export: force all slides visible
     const deck = document.querySelector('.deck');
     if(!deck) return;
-    const slides = deck.querySelectorAll('.slide');
-    slides.forEach(s => {
+    deck.querySelectorAll('.slide').forEach(s => {
       if(on) s.classList.add('is-active');
     });
   }
@@ -50,7 +75,6 @@
     };
 
     const buildStageForSlide = (slideEl) => {
-      // Create an offscreen stage that includes the background + one slide at a fixed 16:9 size
       const stage = document.createElement('div');
       stage.id = 'pdfStage';
 
@@ -61,12 +85,10 @@
       app.className = 'app';
 
       const s = slideEl.cloneNode(true);
-      // Ensure slide is fully visible
       s.classList.add('is-active');
-
       app.appendChild(s);
-      stage.appendChild(app);
 
+      stage.appendChild(app);
       document.body.appendChild(stage);
       return stage;
     };
@@ -78,9 +100,8 @@
     const exportPdf = async () => {
       try{
         setBusy(true);
-        // Export styles: fixed canvas size and no gradient-clip text
         document.body.classList.add('exportingPdf');
-        setExporting(true);
+        setExportingVisible(true);
         await ensureLibs();
 
         const { jsPDF } = window.jspdf;
@@ -90,13 +111,13 @@
         const slides = Array.from(deck.querySelectorAll('.slide'));
         if(!slides.length) throw new Error('No slides found');
 
-        // Perfect 16:9 page size matching our stage (units in px)
+        // Exact 16:9 pages
         const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1920, 1080] });
 
         for(let i=0;i<slides.length;i++){
           const stage = buildStageForSlide(slides[i]);
 
-          // Wait for layout/paint
+          // Let layout settle
           await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
           const canvas = await window.html2canvas(stage, {
@@ -107,8 +128,7 @@
           });
 
           const imgData = canvas.toDataURL('image/png');
-
-          if(i > 0) pdf.addPage([1920,1080], 'landscape');
+          if(i > 0) pdf.addPage([1920, 1080], 'landscape');
           pdf.addImage(imgData, 'PNG', 0, 0, 1920, 1080, undefined, 'FAST');
 
           removeStage(stage);
@@ -117,120 +137,14 @@
         pdf.save('FlowPitch.pdf');
       }catch(err){
         console.error(err);
-        alert('PDF export failed. If you are on iOS, try Chrome/desktop for best results and ensure downloads are allowed.');
+        alert('PDF export failed. If CDN scripts are blocked on your host, allow cdnjs.cloudflare.com or self-host html2canvas + jsPDF.');
       }finally{
         document.body.classList.remove('exportingPdf');
-        setExporting(false);
         setBusy(false);
       }
     };
 
     btn.addEventListener('click', exportPdf);
-  }
-      if(!window.jspdf || !window.jspdf.jsPDF){
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-      }
-    };
-
-    const setBusy = (busy) => {
-      btn.disabled = busy;
-      btn.style.opacity = busy ? '0.65' : '1';
-      btn.textContent = busy ? 'Exporting…' : 'Export PDF';
-      btn.style.pointerEvents = busy ? 'none' : 'auto';
-    };
-
-    const exportPdf = async () => {
-      try{
-        setBusy(true);
-        setExporting(true);
-        await ensureLibs();
-
-        const { jsPDF } = window.jspdf;
-        const scroller = document.querySelector('.app');
-        const deck = document.querySelector('.deck');
-        if(!deck || !scroller) throw new Error('Deck not ready');
-
-        const slides = Array.from(deck.querySelectorAll('.slide'));
-        if(!slides.length) throw new Error('No slides found');
-
-        // Give browser a moment to apply exporting styles
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        // Render first slide to determine page sizing (use A4 landscape for compatibility)
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-
-        for(let i=0;i<slides.length;i++){
-          // Scroll slide into view to avoid iOS canvas blanking
-          slides[i].scrollIntoView({block:'start'});
-          await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-          const canvas = await window.html2canvas(slides[i], {
-            backgroundColor: null,
-            scale: Math.max(2, window.devicePixelRatio || 2),
-            useCORS: true,
-            logging: false
-          });
-
-          const imgData = canvas.toDataURL('image/png');
-
-          // Fit image into page while preserving aspect ratio
-          const imgW = canvas.width;
-          const imgH = canvas.height;
-          const scale = Math.min(pageW / imgW, pageH / imgH);
-          const drawW = imgW * scale;
-          const drawH = imgH * scale;
-          const x = (pageW - drawW) / 2;
-          const y = (pageH - drawH) / 2;
-
-          if(i > 0) pdf.addPage('a4', 'landscape');
-          pdf.addImage(imgData, 'PNG', x, y, drawW, drawH, undefined, 'FAST');
-        }
-
-        // Restore scroll position to top
-        scroller.scrollTo({top: 0, behavior: 'auto'});
-
-        pdf.save('FlowPitch.pdf');
-      }catch(err){
-        console.error(err);
-        alert('PDF export failed. Try again in Chrome desktop, or ensure popups/downloads are allowed.');
-      }finally{
-        setExporting(false);
-        setBusy(false);
-      }
-    };
-
-    btn.addEventListener('click', exportPdf);
-  }
-
-function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
-
-  function setCompact(){
-    const h = window.innerHeight || 800;
-    document.body.classList.toggle('compact', h <= 720);
-  }
-
-  function setTopOffset(){
-    const header = document.querySelector('.topbar');
-    if(!header) return;
-    // header height already includes safe-area padding because the header uses env(safe-area-inset-top)
-    const h = Math.ceil(header.getBoundingClientRect().height);
-    // add a little breathing room so text never kisses the bar
-    const offset = h + 28;
-    document.documentElement.style.setProperty('--topOffset', offset + 'px');
-  }
-
-  function tagForAnimation(root){
-    // Animate common elements in a nice order
-    const targets = root.querySelectorAll(
-      '.kicker, .h1, .h2, .p, .actions, .heroCard, .card, .bigCard, .step'
-    );
-
-    targets.forEach((el, i) => {
-      el.setAttribute('data-animate', 'rise');
-      el.style.setProperty('--stagger', String(i));
-    });
   }
 
   async function load(){
@@ -260,6 +174,7 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
     if(document.fonts && document.fonts.ready){
       document.fonts.ready.then(() => setTopOffset()).catch(() => {});
     }
+
     setupNav(deck);
     setupPdfExport();
   }
@@ -274,12 +189,9 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
     const inner = document.createElement('div');
     inner.className = 'slide__inner';
 
-    // Left column (copy)
     const left = document.createElement('div');
-    const headerBits = buildHeader(slide, type);
-    left.appendChild(headerBits);
+    left.appendChild(buildHeader(slide, type));
 
-    // Right column (visual / cards)
     const right = document.createElement('div');
 
     if(type === 'title'){
@@ -300,7 +212,6 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
     } else if(type === 'content' && slide.note === 'Steps'){
       right.appendChild(buildSteps());
     } else if(type === 'closing'){
-      inner.className = 'slide__inner';
       const card = document.createElement('div');
       card.className = 'bigCard';
       card.appendChild(buildHeader(slide, 'closing'));
@@ -354,7 +265,6 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
     const lines = String(headline).split('\n');
     const safe = lines.map(escapeHtml);
 
-    // Hero emphasis
     if(safe.join('\n').includes('Web-native pitches.')){
       return safe.join('<br/>')
         .replace('Decks', '<span class="grad">Decks</span>')
@@ -512,7 +422,6 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
   function setupNav(container){
     let index = 0;
-
     const slides = () => Array.from(container.querySelectorAll('.slide'));
 
     function go(next){
@@ -525,7 +434,6 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
       container.parentElement.scrollTo({ top, behavior: prefersReduced ? 'auto' : 'smooth' });
     }
 
-    // Keep index in sync with scroll (approx)
     let raf = 0;
     container.parentElement.addEventListener('scroll', () => {
       if(raf) return;
@@ -547,22 +455,16 @@ function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
       const isTyping = /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) ? e.target.tagName : '');
       if(isTyping) return;
 
-      if(key === ' '){
-        e.preventDefault();
-        go(index + 1);
-      } else if(key === 'ArrowDown' || key === 'PageDown'){
-        e.preventDefault();
-        go(index + 1);
+      if(key === ' ' || key === 'ArrowDown' || key === 'PageDown'){
+        e.preventDefault(); go(index + 1);
       } else if(key === 'ArrowUp' || key === 'PageUp'){
-        e.preventDefault();
-        go(index - 1);
+        e.preventDefault(); go(index - 1);
       }
     });
 
-    // Start at top
     go(0);
 
-    // Mark slides active on enter (drives CSS reveal)
+    // Activate slides on enter (drives CSS reveal)
     const list = slides();
     const obs = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
