@@ -287,7 +287,7 @@
 
     const a = document.createElement('a');
     a.className = 'btn btn--primary';
-    a.href = 'https://forms.gle/5dBfBjsfjzXrHoW27';
+    a.href = '#start';
     a.innerHTML = 'Start for free <span class="btn__arrow" aria-hidden="true">→</span>';
 
     const b = document.createElement('a');
@@ -413,7 +413,7 @@
 
     const a = document.createElement('a');
     a.className = 'btn btn--primary';
-    a.href = 'https://forms.gle/5dBfBjsfjzXrHoW27';
+    a.href = '#start';
     a.innerHTML = 'Get started for free <span class="btn__arrow" aria-hidden="true">→</span>';
     actions.appendChild(a);
 
@@ -423,6 +423,7 @@
   function setupNav(container){
     let index = 0;
     const slides = () => Array.from(container.querySelectorAll('.slide'));
+    const scroller = container.parentElement;
 
     function go(next){
       const list = slides();
@@ -431,15 +432,15 @@
       const el = list[index];
       if(!el) return;
       const top = el.offsetTop;
-      container.parentElement.scrollTo({ top, behavior: prefersReduced ? 'auto' : 'smooth' });
+      scroller.scrollTo({ top, behavior: prefersReduced ? 'auto' : 'smooth' });
     }
 
     let raf = 0;
-    container.parentElement.addEventListener('scroll', () => {
+    scroller.addEventListener('scroll', () => {
       if(raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        const sc = container.parentElement.scrollTop;
+        const sc = scroller.scrollTop;
         const list = slides();
         let best = 0, bestDist = Infinity;
         for(let i=0;i<list.length;i++){
@@ -449,6 +450,57 @@
         index = best;
       });
     }, {passive:true});
+
+    // Mouse wheel support (desktop/laptop):
+    // Some browsers + scroll-snap can feel "stuck" with small mouse-wheel deltas.
+    // We translate wheel intent into slide navigation *unless* the user is actively
+    // scrolling a nested scrollable area.
+    let wheelLocked = false;
+    const WHEEL_LOCK_MS = 650;
+
+    function isScrollable(el){
+      if(!el || el === document.body) return false;
+      const style = window.getComputedStyle(el);
+      const oy = style.overflowY;
+      if(!(oy === 'auto' || oy === 'scroll')) return false;
+      return el.scrollHeight > el.clientHeight + 1;
+    }
+
+    function canScrollInDirection(el, dy){
+      if(!isScrollable(el)) return false;
+      if(dy > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+      if(dy < 0) return el.scrollTop > 0;
+      return false;
+    }
+
+    function findScrollableAncestor(start, dy){
+      let el = start;
+      while(el && el !== scroller && el !== document.body){
+        if(canScrollInDirection(el, dy)) return el;
+        el = el.parentElement;
+      }
+      return null;
+    }
+
+    scroller.addEventListener('wheel', (e) => {
+      // Let browser zoom gestures behave normally
+      if(e.ctrlKey) return;
+      const dy = e.deltaY || 0;
+      if(Math.abs(dy) < 2) return;
+
+      // If the user is over a nested scrollable area, allow normal scrolling.
+      const scrollable = findScrollableAncestor(e.target, dy);
+      if(scrollable) return;
+
+      // Otherwise, treat wheel as slide navigation.
+      e.preventDefault();
+      if(wheelLocked) return;
+      wheelLocked = true;
+      setTimeout(() => { wheelLocked = false; }, WHEEL_LOCK_MS);
+
+      if(dy > 0) go(index + 1);
+      else go(index - 1);
+    }, {passive:false});
 
     window.addEventListener('keydown', (e) => {
       const key = e.key;
@@ -472,7 +524,7 @@
           entry.target.classList.add('is-active');
         }
       });
-    }, { root: container.parentElement, threshold: 0.55 });
+    }, { root: scroller, threshold: 0.55 });
 
     list.forEach(s => obs.observe(s));
   }
