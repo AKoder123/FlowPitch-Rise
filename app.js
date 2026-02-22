@@ -287,7 +287,7 @@
 
     const a = document.createElement('a');
     a.className = 'btn btn--primary';
-    a.href = 'https://forms.gle/5dBfBjsfjzXrHoW27';
+    a.href = 'https://forms.gle/Bt3sj9rFyNVFm9ga6';
     a.innerHTML = 'Start for free <span class="btn__arrow" aria-hidden="true">→</span>';
 
     const b = document.createElement('a');
@@ -413,7 +413,7 @@
 
     const a = document.createElement('a');
     a.className = 'btn btn--primary';
-    a.href = 'https://forms.gle/5dBfBjsfjzXrHoW27';
+    a.href = 'https://forms.gle/Bt3sj9rFyNVFm9ga6';
     a.innerHTML = 'Get started for free <span class="btn__arrow" aria-hidden="true">→</span>';
     actions.appendChild(a);
 
